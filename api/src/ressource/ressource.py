@@ -1,6 +1,4 @@
-
 from collections import Counter
-
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Query
 from api.src.model.model import ModelResponseToFront
@@ -24,12 +22,31 @@ app.add_middleware(
 
 app.include_router(router)
 health_counter = Counter("Health_check_requests_total", "Number of health check requests received")
-    
+
+#classe de connexion  
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 @app.get("/api/health")
 async def health():
     health_counter.inc()
     return {"status": "ok"}
+
+@app.post("/api/login")
+async def login(data: LoginRequest):
+
+    if data.email == "admin@test.com" and data.password == "1234":
+        return {
+            "success": True,
+            "message": "Connexion réussie",
+            "user": {
+                "email": data.email
+            }
+        }
+
+    raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+
 
 @app.get("/current", response_model=ModelResponseToFront)
 async def get_response_to_front():
