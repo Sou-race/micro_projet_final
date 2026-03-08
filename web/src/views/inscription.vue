@@ -1,19 +1,27 @@
 <template>
-  <div class="page-connexion">
-    <form class="form-connexion" @submit.prevent="handleLogin">
-      <h2>Connexion</h2>
+  <div class="page-inscription">
+    <form class="form-inscription" @submit.prevent="handleRegister">
+      <h2>Inscription</h2>
 
+      <input v-model="nom" type="text" placeholder="Nom" required />
+      <input v-model="prenom" type="text" placeholder="Prénom" required />
       <input v-model="email" type="email" placeholder="Email" required />
       <input v-model="password" type="password" placeholder="Mot de passe" required />
+      <input
+        v-model="confirmPassword"
+        type="password"
+        placeholder="Confirmer le mot de passe"
+        required
+      />
 
-      <button type="submit">Se connecter</button>
+      <button type="submit">S'inscrire</button>
 
       <p v-if="message" class="message">{{ message }}</p>
 
       <div class="switch-section">
-        <span>Vous n'avez pas encore de compte ?</span>
-        <button type="button" class="switch-button" @click="$emit('go-to-register')">
-          Inscrivez vous
+        <span>Déjà un compte ?</span>
+        <button type="button" class="switch-button" @click="$emit('go-to-login')">
+          Connectez vous
         </button>
       </div>
     </form>
@@ -23,22 +31,32 @@
 <script setup>
 import { ref } from "vue"
 
-defineEmits(["go-to-register"])
+defineEmits(["go-to-login"])
 
+const nom = ref("")
+const prenom = ref("")
 const email = ref("")
 const password = ref("")
+const confirmPassword = ref("")
 const message = ref("")
 
-const handleLogin = async () => {
+const handleRegister = async () => {
   message.value = ""
 
+  if (password.value !== confirmPassword.value) {
+    message.value = "Les mots de passe ne correspondent pas"
+    return
+  }
+
   try {
-    const response = await fetch("http://localhost:8000/prouteur/api/login", {
+    const response = await fetch("http://localhost:8000/prouteur/api/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        nom: nom.value,
+        prenom: prenom.value,
         email: email.value,
         password: password.value
       })
@@ -48,9 +66,13 @@ const handleLogin = async () => {
 
     if (response.ok) {
       message.value = data.message
-      localStorage.setItem("user", JSON.stringify(data.user))
+      nom.value = ""
+      prenom.value = ""
+      email.value = ""
+      password.value = ""
+      confirmPassword.value = ""
     } else {
-      message.value = data.detail || "Erreur de connexion"
+      message.value = data.detail || "Erreur lors de l'inscription"
     }
   } catch (error) {
     message.value = "Serveur inaccessible"
@@ -59,7 +81,7 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-.page-connexion {
+.page-inscription {
   min-height: 100vh;
   display: flex;
   justify-content: center;
@@ -67,7 +89,7 @@ const handleLogin = async () => {
   background: #f3f4f6;
 }
 
-.form-connexion {
+.form-inscription {
   width: 360px;
   background: white;
   padding: 24px;

@@ -1,54 +1,78 @@
-from collections import Counter
+from prometheus_client import Counter
 import httpx
-from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
 from api.src.model.model import ModelResponseToFront
-from api.src.service.service import test
-from fastapi.middleware.cors import CORSMiddleware
+from api.src.service.service import test, create_user, verify_user
+from bdd.database import get_db
 
 router = APIRouter(prefix="/prouteur", tags=["Prouteur"])
 
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://happygood0.github.io",
-        "http://localhost:5173",
-        "http://localhost",
-    ],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+health_counter = Counter(
+    "Health_check_requests_total",
+    "Number of health check requests received"
 )
-
-app.include_router(router)
-health_counter = Counter("Health_check_requests_total", "Number of health check requests received")
 
 #classe de connexion  
 class LoginRequest(BaseModel):
     email: str
     password: str
 
-@app.get("/api/health")
+#classe d'inscription
+class RegisterRequest(BaseModel):
+    nom: str
+    prenom: str
+    email: EmailStr
+    password: str
+
+@router.get("/api/health")
 async def health():
     health_counter.inc()
     return {"status": "ok"}
 
-@app.post("/api/login")
-async def login(data: LoginRequest):
+@router.post("/api/register")
+def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
-    if data.email == "admin@test.com" and data.password == "1234":
-        return {
-            "success": True,
-            "message": "Connexion réussie",
-            "user": {
-                "email": data.email
-            }
+    user = create_user(
+        db,
+        data.nom,
+        data.prenom,
+        data.email,
+        data.password
+    )
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Email déjà utilisé")
+
+    return {
+        "success": True,
+        "message": "Utilisateur créé",
+        "user": {
+            "id": user.id,
+            "nom": user.nom,
+            "prenom": user.prenom,
+            "email": user.email
         }
+    }
 
-    raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+@router.post("/api/login")
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = verify_user(db, data.email, data.password)
 
+    if not user:
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
 
-@app.get("/current", response_model=ModelResponseToFront)
+    return {
+        "success": True,
+        "message": "Connexion réussie",
+        "user": {
+            "id": user.id,
+            "email": user.email
+        }
+    }
+
+@router.get("/current", response_model=ModelResponseToFront)
 async def get_response_to_front():
     
     try:
