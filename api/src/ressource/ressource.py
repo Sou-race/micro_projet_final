@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from api.src.model.model import ModelResponseToFront
 from api.src.service.service import test, create_user, verify_user
 from bdd.database import get_db
+from api.src.training.benchmark import create_job, get_job_status
 
 router = APIRouter(prefix="/prouteur", tags=["Prouteur"])
 
@@ -25,6 +26,10 @@ class RegisterRequest(BaseModel):
     prenom: str
     email: EmailStr
     password: str
+#recup le nom du dataset sur lequel on veut train nos modèles
+class BenchmarkRequest(BaseModel):
+    dataset: str
+    epochs: int = 15
 
 @router.get("/api/health")
 async def health():
@@ -68,9 +73,30 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         "message": "Connexion réussie",
         "user": {
             "id": user.id,
+            "nom": user.nom,
+            "prenom": user.prenom,
             "email": user.email
         }
     }
+
+@router.post("/benchmark/start")
+def start_benchmark(data: BenchmarkRequest):
+    job_id = create_job(data.dataset, data.epochs)
+
+    return {
+        "message": "Benchmark lancé",
+        "job_id": job_id
+    }
+
+@router.get("/benchmark/status/{job_id}")
+def benchmark_status(job_id: str):
+    job = get_job_status(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job introuvable")
+
+    return job
+
 
 @router.get("/current", response_model=ModelResponseToFront)
 async def get_response_to_front():
