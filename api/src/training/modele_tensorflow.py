@@ -31,7 +31,7 @@ def load_dataset(dataset):
     return x_train, y_train, x_test, y_test, num_classes
 
 
-def train_tensorflow(dataset, epochs=15, progress_callback=None):
+def train_tensorflow(dataset, epochs=15, progress_callback = None, cpu_samples = [], ram_samples = []):
     x_train, y_train, x_test, y_test, num_classes = load_dataset(dataset)
 
     model = tf.keras.Sequential([
@@ -64,10 +64,17 @@ def train_tensorflow(dataset, epochs=15, progress_callback=None):
             "accuracy": float(accuracy),
             "elapsed_time": time.time() - start
         }
-        history.append(point)
+
+        stats = {
+            "cpu_avg": round(sum(cpu_samples) / len(cpu_samples), 2) if cpu_samples else 0,
+            "cpu_max": round(max(cpu_samples), 2) if cpu_samples else 0,
+            "ram_avg_gb": round(sum(ram_samples) / len(ram_samples), 2) if ram_samples else 0,
+            "ram_max_gb": round(max(ram_samples), 2) if ram_samples else 0,
+        }
 
         if progress_callback:
-            progress_callback("tensorflow", point)
+            progress_callback("tensorflow", point | stats)
+        history.append(point)
 
     return {
         "library": "tensorflow",

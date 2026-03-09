@@ -10,3 +10,4 @@ bcrypt
 torch
 torchvision
 tensorflow
+psutil

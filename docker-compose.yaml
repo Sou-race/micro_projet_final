@@ -10,7 +10,8 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/microprojetdb
-
+    networks:
+      - micro_network
   web:
     image: node:20
     working_dir: /app
@@ -22,7 +23,8 @@ services:
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     depends_on:
       - microserviceprojet
-
+    networks:
+      - micro_network
   db:
     image: postgres:15
     container_name: microprojet-db
@@ -35,6 +37,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
+    networks:
+      - micro_network
 volumes:
   postgres_data:
+
+networks:
+  micro_network:
+    driver: bridge
