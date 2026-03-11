@@ -12,7 +12,8 @@ services:
       db:
         condition: service_started
     volumes:
-      - ./api/src/training/datasets:/app/datasets
+      - ./api/src/training/datasets/cifar100:/app/datasets/cifar100
+      - ./api/src/training/datasets/fashion_mnist:/app/datasets/fashion_mnist
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/microprojetdb
       KAFKA_BROKER: kafka:9092
