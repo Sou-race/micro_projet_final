@@ -11,3 +11,5 @@ torch
 torchvision
 tensorflow
 psutil
+numpy
+kafka-python-ng

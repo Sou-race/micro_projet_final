@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
 
 class Model(nn.Module):
     def __init__(self, input_size, num_classes):
@@ -17,43 +17,35 @@ class Model(nn.Module):
 
 
 def load_dataset(dataset):
-    transform = transforms.ToTensor()
-
     if dataset == "fashion_mnist":
-        train_dataset = datasets.FashionMNIST(
-            root="./data",
-            train=True,
-            download=True,
-            transform=transform
-        )
-        test_dataset = datasets.FashionMNIST(
-            root="./data",
-            train=False,
-            download=True,
-            transform=transform
-        )
-        input_size = 28 * 28
+        cache_path = "/app/datasets/fashion_mnist/"
+        x_train = np.load( cache_path + "x_train.npy")
+        y_train = np.load( cache_path + "y_train.npy")
+        x_test  = np.load( cache_path + "x_test.npy")
+        y_test  = np.load( cache_path + "y_test.npy")
+        input_size  = 28 * 28
         num_classes = 10
 
     elif dataset == "cifar100":
-        train_dataset = datasets.CIFAR100(
-            root="./data",
-            train=True,
-            download=True,
-            transform=transform
-        )
-        test_dataset = datasets.CIFAR100(
-            root="./data",
-            train=False,
-            download=True,
-            transform=transform
-        )
-        input_size = 32 * 32 * 3
+        cache_path = "/app/datasets/cifar100/"
+        x_train = np.load( cache_path + "x_train.npy")
+        y_train = np.load( cache_path + "y_train.npy")
+        x_test  = np.load( cache_path + "x_test.npy")
+        y_test  = np.load( cache_path + "y_test.npy")
+        input_size  = 32 * 32 * 3
         num_classes = 100
 
     else:
         raise ValueError("dataset inconnu")
-
+    
+    train_dataset = TensorDataset(
+        torch.tensor(x_train, dtype=torch.float32),
+        torch.tensor(y_train, dtype=torch.long).squeeze()
+    )
+    test_dataset = TensorDataset(
+        torch.tensor(x_test, dtype=torch.float32),
+        torch.tensor(y_test, dtype=torch.long).squeeze()
+    )
     return train_dataset, test_dataset, input_size, num_classes
 
 
