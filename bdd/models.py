@@ -12,3 +12,5 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
 
     password = Column(String, nullable=False)
+
+    admin = Column(String, default="False", nullable=False)

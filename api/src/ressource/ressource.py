@@ -26,6 +26,8 @@ class RegisterRequest(BaseModel):
     prenom: str
     email: EmailStr
     password: str
+    admin: str = "False"  
+
 #recup le nom du dataset sur lequel on veut train nos modèles
 class BenchmarkRequest(BaseModel):
     dataset: str
@@ -42,9 +44,10 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     user = create_user(
         db,
         data.nom,
-        data.prenom,
+        data.prenom,# Par défaut, les utilisateurs ne sont pas des admins
         data.email,
-        data.password
+        data.password,
+        data.admin
     )
 
     if not user:
@@ -57,7 +60,8 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
             "id": user.id,
             "nom": user.nom,
             "prenom": user.prenom,
-            "email": user.email
+            "email": user.email,
+            "admin": user.admin
         }
     }
 
@@ -75,7 +79,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
             "id": user.id,
             "nom": user.nom,
             "prenom": user.prenom,
-            "email": user.email
+            "email": user.email,
+            "admin": user.admin
         }
     }
 

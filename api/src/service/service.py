@@ -23,7 +23,7 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
 
-def create_user(db, nom, prenom, email, password):
+def create_user(db, nom, prenom, email, password, admin):
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
         return None
@@ -34,7 +34,8 @@ def create_user(db, nom, prenom, email, password):
         nom=nom,
         prenom=prenom,
         email=email,
-        password=hashed_password
+        password=hashed_password,
+        admin= admin
     )
 
     db.add(user)
