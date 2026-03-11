@@ -11,6 +11,8 @@ services:
         condition: service_started
       db:
         condition: service_started
+    volumes:
+      - ./api/src/training/datasets:/app/datasets
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/microprojetdb
       KAFKA_BROKER: kafka:9092
