@@ -5,6 +5,7 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
+from api.src.kafkaOption.producer import sendData
 
 class Model(nn.Module):
     def __init__(self, input_size, num_classes):
@@ -109,6 +110,8 @@ def train_pytorch(dataset, epochs=15, progress_callback = None, cpu_samples = []
         if progress_callback:
             progress_callback("pytorch", point | stats)
         history.append(point)
+
+        sendData("pytorchData", "yes")
 
     return {
         "library": "pytorch",
