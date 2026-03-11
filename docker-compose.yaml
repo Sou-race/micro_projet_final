@@ -7,10 +7,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - kafka
-    volumes:
-      - ./api/src/training/datasets:/app/datasets
+      kafka:
+        condition: service_started
+      db:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/microprojetdb
       KAFKA_BROKER: kafka:9092
@@ -52,15 +52,16 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: EXTERNAL://:9092,INTERNAL://:9094,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka:9094
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       KAFKA_NUM_PARTITIONS: 2
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
 
   kafka-ui:
     image: provectuslabs/kafka-ui
