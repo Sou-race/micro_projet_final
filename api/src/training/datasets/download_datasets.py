@@ -6,10 +6,12 @@ from pathlib import Path
 DATASETS_DIR = "/app"
 
 def download_and_cache(dataset_name, loader_fn, num_classes, shape):
-    fichier = Path("cifar100")
+    cache_path = os.path.join(DATASETS_DIR, "datasets", dataset_name)
+    fichier = Path(cache_path) / "x_train.npy"  
+
     if not fichier.exists():
-        cache_path = os.path.join(DATASETS_DIR, "datasets/" + dataset_name)
-        print(f"Téléchargement de {dataset_name}...")
+        print(f"Téléchargement de {dataset_name}... FONCTION DOWNLOAD DATASET")
+
         (x_train, y_train), (x_test, y_test) = loader_fn()
         x_train = x_train / 255.0
         x_test  = x_test  / 255.0
@@ -22,6 +24,5 @@ def download_and_cache(dataset_name, loader_fn, num_classes, shape):
         np.save(os.path.join(cache_path, "y_test.npy"),  y_test)
         np.save(os.path.join(cache_path, "num_classes.npy"), np.array(num_classes))
         print(f"✓ {dataset_name} sauvegardé dans {cache_path}/")
-
-
-print("\nTous les datasets sont prêts !")
+    else:
+        print(f"✓ {dataset_name} déjà en cache, chargement ignoré.")

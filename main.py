@@ -62,8 +62,12 @@ def seed_default_users():
 
 app.include_router(router)
 
-
+print("telechargement de fashion_minst")
+print()
 download_and_cache("fashion_mnist", tf.keras.datasets.fashion_mnist.load_data, 10,  28*28)
+print("telechargement de cifar100")
+print()
 download_and_cache("cifar100",      tf.keras.datasets.cifar100.load_data,      100, 32*32*3)
-
+print("telechargement terminé")
+print()
 
