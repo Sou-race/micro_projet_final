@@ -10,7 +10,10 @@ from bdd.database import get_db
 from api.src.service.service import create_user
 from bdd.models import User
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="microservice projet")
@@ -31,7 +34,7 @@ def parse_default_users():
     users_raw = os.getenv("DEFAULT_USERS", "")
     users = []
     for entry in users_raw.split(","):
-        parts = entry.strip().split(":")
+        parts = [p.strip() for p in entry.strip().split(":")]  # strip sur chaque part
         if len(parts) == 5:
             users.append({
                 "nom":      parts[0],
@@ -43,7 +46,9 @@ def parse_default_users():
     return users
 
 def seed_default_users():
-    db: Session = get_db()  
+    db_gen: Session = get_db() 
+    db = next(db_gen)
+    db.commit() 
     try:
         for user in parse_default_users():
             existing = db.query(User).filter(User.email == user["email"]).first()
@@ -56,12 +61,19 @@ def seed_default_users():
                     password=user["password"],
                     admin=user["admin"]
                 )
+                db.commit()
+                print("utilisateur ajouté:", user["email"])
     finally:
         db.close()
 
 
 app.include_router(router)
 
+
+print("Users à insérer:", parse_default_users())
+seed_default_users()
+print("ajout d'utilisateurs par défaut")
+seed_default_users()
 print("telechargement de fashion_minst")
 print()
 download_and_cache("fashion_mnist", tf.keras.datasets.fashion_mnist.load_data, 10,  28*28)

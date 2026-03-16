@@ -13,3 +13,4 @@ tensorflow
 psutil
 numpy
 kafka-python-ng
+python-dotenv

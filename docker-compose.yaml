@@ -13,6 +13,8 @@ services:
         condition: service_started
     volumes:
       - datasets_cache:/app/datasets
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/microprojetdb
       KAFKA_BROKER: kafka:9092
