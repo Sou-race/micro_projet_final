@@ -77,6 +77,11 @@ def train_pytorch(dataset, epochs=15, progress_callback = None, cpu_samples = []
     start = time.time()
     history = []
 
+    test = {
+    "testid": "1",
+    "teststr": "test"
+    }
+    
     for epoch in range(epochs):
         epoch_loss = 0.0
 
@@ -111,8 +116,7 @@ def train_pytorch(dataset, epochs=15, progress_callback = None, cpu_samples = []
             progress_callback("pytorch", point | stats)
         history.append(point)
 
-        sendData("pytorchData", "yes")
-
+        sendData((test))
     return {
         "library": "pytorch",
         "dataset": dataset,
