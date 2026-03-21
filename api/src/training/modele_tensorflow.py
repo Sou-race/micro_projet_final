@@ -2,6 +2,7 @@ import os
 import time
 import tensorflow as tf
 import numpy as np
+from api.src.kafkaOption.producer import sendData
 
 
 
@@ -28,7 +29,7 @@ def load_dataset(dataset):
     return x_train, y_train, x_test, y_test, num_classes
 
 
-def train_tensorflow(dataset, epochs=15, progress_callback = None, cpu_samples = [], ram_samples = []):
+def train_tensorflow(dataset, epochs=15, cpu_samples = [], ram_samples = []):
     x_train, y_train, x_test, y_test, num_classes = load_dataset(dataset)
 
     model = tf.keras.Sequential([
@@ -69,10 +70,13 @@ def train_tensorflow(dataset, epochs=15, progress_callback = None, cpu_samples =
             "ram_max_gb": round(max(ram_samples), 2) if ram_samples else 0,
         }
 
-        if progress_callback:
-            progress_callback("tensorflow", point | stats)
+        sendData(point | stats, "tensorflow")
+        #if progress_callback:
+        #    progress_callback("tensorflow", point | stats)
+
         history.append(point)
 
+        
     return {
         "library": "tensorflow",
         "dataset": dataset,

@@ -6,9 +6,13 @@ import psutil
 
 import time
 
+from flask import json
+
 from concurrent.futures import ProcessPoolExecutor
 from api.src.training.modele_pytorch import train_pytorch
 from api.src.training.modele_tensorflow import train_tensorflow
+from api.src.kafkaOption.consumer import consumeData, consumerModel
+
 
 benchmark_jobs = {}
 benchmark_lock = threading.Lock()
@@ -28,14 +32,19 @@ def create_job(dataset, epochs=15):
                 "tensorflow": {"history": [], "done": False}
             }
         }
-
+    monitor_thread = threading.Thread(
+            target=consumeModelData, 
+            args=(job_id,), 
+            daemon=True
+        )
+    monitor_thread.start()
     executor = ThreadPoolExecutor(max_workers=2)
     executor.submit(run_benchmark_parallel, job_id, dataset, epochs)
 
     return job_id
 
 
-def train_with_monitoring(train_func, dataset, epochs, progress_callback, lib_name):
+def train_with_monitoring(train_func, dataset, epochs, lib_name):
     """Wrapper qui exécute l'entraînement ET monitore ses propres ressources"""
     stop_event = threading.Event()
     cpu_samples = []
@@ -51,7 +60,8 @@ def train_with_monitoring(train_func, dataset, epochs, progress_callback, lib_na
     monitor_thread = threading.Thread(target=_monitor, daemon=True)
     monitor_thread.start()
 
-    result, point = train_func(dataset, epochs, progress_callback, cpu_samples, ram_samples)
+    result, point = train_func(dataset, epochs, cpu_samples, ram_samples)
+    
 
     stop_event.set()
     monitor_thread.join()
@@ -60,9 +70,39 @@ def train_with_monitoring(train_func, dataset, epochs, progress_callback, lib_na
     print()
     return {"result": result}
 
-def update_progress(job_id, library, point):
-    with benchmark_lock:
-        benchmark_jobs[job_id]["results"][library]["history"].append(point)
+#def update_progress(job_id, library, point):
+#    with benchmark_lock:
+#        benchmark_jobs[job_id]["results"][library]["history"].append(point)
+
+
+def consumeModelData(jobId):
+    def _loop():
+        while True:
+            try:
+                msg = consumerModel.poll(1.0)
+            
+                if msg is None: continue
+
+                if msg.error():
+                        print(f"Kafka Wait/Error: {msg.error()}")
+                        continue
+                
+                data = json.loads(msg.value().decode("utf_8"))
+                lib = msg.topic()
+                print(lib)
+                print(data)
+
+                if jobId in benchmark_jobs:
+                    with benchmark_lock:
+                        benchmark_jobs[jobId]["results"][lib]["history"].append(data)
+                        print(benchmark_jobs)
+                        
+
+            except Exception as e:
+                print(f"Erreur: {e}")
+
+    threading.Thread(target=_loop, daemon=True).start()
+
 
 
 def run_benchmark_parallel(job_id, dataset, epochs):
@@ -73,7 +113,6 @@ def run_benchmark_parallel(job_id, dataset, epochs):
                 train_pytorch,
                 dataset,
                 epochs,
-                lambda lib, point: update_progress(job_id, lib, point),
                 "pytorch"
             )
             tensorflow_future = pool.submit(
@@ -81,7 +120,6 @@ def run_benchmark_parallel(job_id, dataset, epochs):
                 train_tensorflow,
                 dataset,
                 epochs,
-                lambda lib, point: update_progress(job_id, lib, point),
                 "tensorflow"
             )
 
