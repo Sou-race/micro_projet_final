@@ -11,6 +11,8 @@ services:
         condition: service_started
       db:
         condition: service_started
+      kafka-setup:
+        condition: service_completed_successfully
     volumes:
       - datasets_cache:/app/datasets
     env_file:
@@ -59,7 +61,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      
+
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       
@@ -91,7 +93,22 @@ services:
       - kafka
     networks:
       - micro_network
-
+  kafka-setup:
+      image: confluentinc/cp-kafka:7.8.3
+      depends_on:
+        - kafka
+      command: >
+        bash -c "
+          echo 'Attente de Kafka...'
+          cub kafka-ready -b kafka:29092 1 30;
+          
+          echo 'Tentative de suppression du groupe dataModel...'
+          kafka-consumer-groups --bootstrap-server kafka:29092 --delete --group dataModel || echo 'Le groupe n existe pas encore, passage à la suite.';
+          
+          echo 'Nettoyage terminé !'
+        "
+      networks:
+      - micro_network
 volumes:
   postgres_data:
   datasets_cache:

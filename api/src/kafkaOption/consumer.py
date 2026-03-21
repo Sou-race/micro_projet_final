@@ -4,7 +4,7 @@ from flask import json
 consumerConfig = {
     'bootstrap.servers': 'kafka:29092',
     'group.id': 'dataModel',
-    'auto.offset.reset':'earliest',
+    'auto.offset.reset':'latest',
     'session.timeout.ms': 6000,
     'heartbeat.interval.ms': 2000
 }
