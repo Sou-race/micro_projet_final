@@ -111,7 +111,7 @@ def train_pytorch(dataset, epochs=15, cpu_samples = [], ram_samples = []):
 
         #if progress_callback:
         #    progress_callback("pytorch", point | stats)
-        history.append(point)
+        history.append(point | stats)
 
     
     return {

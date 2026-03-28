@@ -74,7 +74,7 @@ def train_tensorflow(dataset, epochs=15, cpu_samples = [], ram_samples = []):
         #if progress_callback:
         #    progress_callback("tensorflow", point | stats)
 
-        history.append(point)
+        history.append(point | stats)
 
         
     return {

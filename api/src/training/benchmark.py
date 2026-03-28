@@ -1,27 +1,60 @@
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-
 import psutil
-
 import time
-
+import os
 from flask import json
-
-from concurrent.futures import ProcessPoolExecutor
+from confluent_kafka import Consumer
 from api.src.training.modele_pytorch import train_pytorch
 from api.src.training.modele_tensorflow import train_tensorflow
-from api.src.kafkaOption.consumer import consumeData, consumerModel
-
 
 benchmark_jobs = {}
 benchmark_lock = threading.Lock()
+current_job_id = None
+
+
+def _make_consumer(topic):
+    c = Consumer({
+        'bootstrap.servers': 'kafka:29092',
+        'group.id': f'dataModel-{topic}',
+        'auto.offset.reset': 'latest',
+        'session.timeout.ms': 6000,
+        'heartbeat.interval.ms': 2000
+    })
+    c.subscribe([topic])
+    return c
+
+
+def _consumer_loop(topic):
+    consumer = _make_consumer(topic)
+    while True:
+        try:
+            msg = consumer.poll(1.0)
+            if msg is None:
+                continue
+            if msg.error():
+                print(f"Kafka error [{topic}]: {msg.error()}")
+                continue
+            data = json.loads(msg.value().decode("utf-8"))
+            with benchmark_lock:
+                if current_job_id and current_job_id in benchmark_jobs:
+                    benchmark_jobs[current_job_id]["results"][topic]["history"].append(data)
+        except Exception as e:
+            print(f"Consumer error [{topic}]: {e}")
+
+
+#un thread consumer dédié par topic
+threading.Thread(target=_consumer_loop, args=("pytorch",), daemon=True).start()
+threading.Thread(target=_consumer_loop, args=("tensorflow",), daemon=True).start()
 
 
 def create_job(dataset, epochs=15):
+    global current_job_id
     job_id = str(uuid.uuid4())
 
     with benchmark_lock:
+        current_job_id = job_id
         benchmark_jobs[job_id] = {
             "job_id": job_id,
             "dataset": dataset,
@@ -32,12 +65,7 @@ def create_job(dataset, epochs=15):
                 "tensorflow": {"history": [], "done": False}
             }
         }
-    monitor_thread = threading.Thread(
-            target=consumeModelData, 
-            args=(job_id,), 
-            daemon=True
-        )
-    monitor_thread.start()
+
     executor = ThreadPoolExecutor(max_workers=2)
     executor.submit(run_benchmark_parallel, job_id, dataset, epochs)
 
@@ -45,7 +73,6 @@ def create_job(dataset, epochs=15):
 
 
 def train_with_monitoring(train_func, dataset, epochs, lib_name):
-    """Wrapper qui exécute l'entraînement ET monitore ses propres ressources"""
     stop_event = threading.Event()
     cpu_samples = []
     ram_samples = []
@@ -53,74 +80,42 @@ def train_with_monitoring(train_func, dataset, epochs, lib_name):
     def _monitor():
         proc = psutil.Process()
         while not stop_event.is_set():
-            cpu_samples.append(proc.cpu_percent(interval=None))
+            cpu_samples.append(proc.cpu_percent(interval=None) / os.cpu_count())
             ram_samples.append(proc.memory_info().rss / (1024 ** 3))
             time.sleep(0.5)
 
     monitor_thread = threading.Thread(target=_monitor, daemon=True)
     monitor_thread.start()
 
-    result, point = train_func(dataset, epochs, cpu_samples, ram_samples)
-    
+    result = train_func(dataset, epochs, cpu_samples, ram_samples)
 
     stop_event.set()
     monitor_thread.join()
 
-    print("Stats for", lib_name)
-    print()
-    return {"result": result}
+    avg_cpu = round(sum(cpu_samples) / len(cpu_samples), 2) if cpu_samples else 0
+    max_cpu = round(max(cpu_samples), 2) if cpu_samples else 0
+    avg_ram = round(sum(ram_samples) / len(ram_samples), 2) if ram_samples else 0
+    max_ram = round(max(ram_samples), 2) if ram_samples else 0
 
-#def update_progress(job_id, library, point):
-#    with benchmark_lock:
-#        benchmark_jobs[job_id]["results"][library]["history"].append(point)
-
-
-def consumeModelData(jobId):
-    def _loop():
-        while True:
-            try:
-                msg = consumerModel.poll(1.0)
-            
-                if msg is None: continue
-
-                if msg.error():
-                        print(f"Kafka Wait/Error: {msg.error()}")
-                        continue
-                
-                data = json.loads(msg.value().decode("utf_8"))
-                lib = msg.topic()
-                print(lib)
-                print(data)
-
-                if jobId in benchmark_jobs:
-                    with benchmark_lock:
-                        benchmark_jobs[jobId]["results"][lib]["history"].append(data)
-                        print(benchmark_jobs)
-                        
-
-            except Exception as e:
-                print(f"Erreur: {e}")
-
-    threading.Thread(target=_loop, daemon=True).start()
-
+    return {
+        "result": result,
+        "stats": {
+            "cpu_avg": avg_cpu,
+            "cpu_max": max_cpu,
+            "ram_avg_gb": avg_ram,
+            "ram_max_gb": max_ram,
+        }
+    }
 
 
 def run_benchmark_parallel(job_id, dataset, epochs):
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             pytorch_future = pool.submit(
-                train_with_monitoring,
-                train_pytorch,
-                dataset,
-                epochs,
-                "pytorch"
+                train_with_monitoring, train_pytorch, dataset, epochs, "pytorch"
             )
             tensorflow_future = pool.submit(
-                train_with_monitoring,
-                train_tensorflow,
-                dataset,
-                epochs,
-                "tensorflow"
+                train_with_monitoring, train_tensorflow, dataset, epochs, "tensorflow"
             )
 
             pytorch_output = pytorch_future.result()
@@ -135,6 +130,7 @@ def run_benchmark_parallel(job_id, dataset, epochs):
             benchmark_jobs[job_id]["results"]["pytorch"].update({
                 "done": True,
                 "final": pytorch_result,
+                "history": pytorch_result.get("history", []),
                 "CPU_usage": pytorch_stats["cpu_avg"],
                 "CPU_peak": pytorch_stats["cpu_max"],
                 "RAM_usage": pytorch_stats["ram_avg_gb"],
@@ -143,6 +139,7 @@ def run_benchmark_parallel(job_id, dataset, epochs):
             benchmark_jobs[job_id]["results"]["tensorflow"].update({
                 "done": True,
                 "final": tensorflow_result,
+                "history": tensorflow_result.get("history", []),
                 "CPU_usage": tensorflow_stats["cpu_avg"],
                 "CPU_peak": tensorflow_stats["cpu_max"],
                 "RAM_usage": tensorflow_stats["ram_avg_gb"],
@@ -154,6 +151,7 @@ def run_benchmark_parallel(job_id, dataset, epochs):
         with benchmark_lock:
             benchmark_jobs[job_id]["status"] = "failed"
             benchmark_jobs[job_id]["error"] = str(e)
+
 
 def get_job_status(job_id):
     with benchmark_lock:
