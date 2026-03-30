@@ -30,6 +30,7 @@ const handleLogin = async () => {
     const data = await response.json()
     if (response.ok) {
       localStorage.setItem("user", JSON.stringify(data.user))
+      localStorage.setItem("token", data.access_token)
       router.push("/benchmark")
     } else {
       message.value = data.detail

@@ -1,14 +1,16 @@
+from fastapi.security import OAuth2PasswordBearer
 from prometheus_client import Counter
 import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from api.src.model.model import ModelResponseToFront
-from api.src.service.service import test, create_user, verify_user
+from api.src.service.service import test, create_user, verify_user,create_access_token, get_current_user
 from bdd.database import get_db
 from api.src.training.benchmark import create_job, get_job_status
-
 router = APIRouter(prefix="/prouteur", tags=["Prouteur"])
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="prouteur/api/login")
 
 health_counter = Counter(
     "Health_check_requests_total",
@@ -26,14 +28,12 @@ class RegisterRequest(BaseModel):
     prenom: str
     email: EmailStr
     password: str
-    admin: str = "False"  
+    
 
 #recup le nom du dataset sur lequel on veut train nos modèles
 class BenchmarkRequest(BaseModel):
     dataset: str
     epochs: int = 15
-
-
 
 @router.get("/api/health")
 async def health():
@@ -49,7 +49,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
         data.prenom,# Par défaut, les utilisateurs ne sont pas des admins
         data.email,
         data.password,
-        data.admin
+        "False"
     )
 
     if not user:
@@ -73,9 +73,11 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-
+    access_token = create_access_token(data={"sub": user.email})
     return {
         "success": True,
+        "access_token": access_token,
+        "token_type": "bearer",
         "message": "Connexion réussie",
         "user": {
             "id": user.id,
@@ -87,16 +89,15 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     }
 
 @router.post("/benchmark/start")
-def start_benchmark(data: BenchmarkRequest):
-    job_id = create_job(data.dataset, data.epochs)
-
+def start_benchmark(data: BenchmarkRequest, token: str = Depends(get_current_user)):
+    job_id = create_job(data.dataset, 15)
     return {
         "message": "Benchmark lancé",
         "job_id": job_id
     }
 
-@router.get("/benchmark/status/{job_id}")
-def benchmark_status(job_id: str):
+@router.get("/benchmark/status/{job_id}",)
+def benchmark_status(job_id: str,token: str = Depends(oauth2_scheme)):
     job = get_job_status(job_id)
 
     if not job:
@@ -121,11 +122,11 @@ async def get_response_to_front():
             ) from e
         raise HTTPException(
             status_code=e.response.status_code,
-            detail=f"Erreur lors de la récupération des données de jeu: {str(e)}",
+            detail=f"Erreur lors de la récupération des données de jeu:",
         ) from e
     except httpx.HTTPError as e:
         raise HTTPException(
-            status_code=500, detail=f"Erreur de connexion à l'API de jeux: {str(e)}"
+            status_code=500, detail=f"Erreur de connexion à l'API de jeux"
         ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur") from e

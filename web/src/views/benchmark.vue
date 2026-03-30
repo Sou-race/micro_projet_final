@@ -161,20 +161,32 @@ onUnmounted(() => {
 const logout = () => {
   if (interval) clearInterval(interval)
   localStorage.removeItem("user")
+  localStorage.removeItem("token")
   router.push("/connexion")
 }
 
 const startBenchmark = async () => {
   if (running.value) return
+  const token = localStorage.getItem("token")
+  if (!token) {
+    router.push("/connexion")
+    return
+  }
   running.value = true
   message.value = "Lancement…"
   await initCharts()
   try {
     const res = await fetch("http://localhost:8000/prouteur/benchmark/start", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
       body: JSON.stringify({ dataset: dataset.value, epochs: 15 }),
     })
+    if (res.status === 401) {
+      logout() 
+      return
+    }
     const data = await res.json()
     jobId.value = data.job_id
     message.value = "Benchmark en cours…"
@@ -187,8 +199,16 @@ const startBenchmark = async () => {
 
 const updateStatus = async () => {
   if (!jobId.value) return
+  const token = localStorage.getItem("token")
   try {
-    const res = await fetch(`http://localhost:8000/prouteur/benchmark/status/${jobId.value}`)
+    const res = await fetch(`http://localhost:8000/prouteur/benchmark/status/${jobId.value}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+    if (res.status === 401) {
+      clearInterval(interval)
+      logout()
+      return
+    }
     const data = await res.json()
     const pt = data.results?.pytorch?.history ?? []
     const tf = data.results?.tensorflow?.history ?? []
