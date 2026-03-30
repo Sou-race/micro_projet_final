@@ -20,6 +20,7 @@ services:
       KAFKA_BROKER: kafka:9092
     networks:
       - micro_network
+      - exposed
 
   web:
     image: node:20
@@ -34,6 +35,7 @@ services:
       - microserviceprojet
     networks:
       - micro_network
+      - exposed
   db:
     image: postgres:15
     container_name: microprojet-db
@@ -48,7 +50,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - micro_network
-
   kafka:
     image: apache/kafka:latest
     ports:
@@ -76,7 +77,6 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
       - kafka
-
 volumes:
   postgres_data:
   datasets_cache:
@@ -84,3 +84,7 @@ volumes:
 networks:
   micro_network:
     driver: bridge
+    internal: true
+  exposed:
+    driver: bridge
+    internal: false
