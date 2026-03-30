@@ -64,7 +64,7 @@ def evaluate_model(model, test_loader):
     return correct / total
 
 
-def train_pytorch(dataset, epochs=15, progress_callback = None, cpu_samples = [], ram_samples = []):
+def train_pytorch(dataset, epochs=15, cpu_samples = [], ram_samples = []):
     train_dataset, test_dataset, input_size, num_classes = load_dataset(dataset)
 
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
@@ -77,6 +77,7 @@ def train_pytorch(dataset, epochs=15, progress_callback = None, cpu_samples = []
     start = time.time()
     history = []
 
+    
     for epoch in range(epochs):
         epoch_loss = 0.0
 
@@ -106,13 +107,13 @@ def train_pytorch(dataset, epochs=15, progress_callback = None, cpu_samples = []
             "ram_avg_gb": round(sum(ram_samples) / len(ram_samples), 2) if ram_samples else 0,
             "ram_max_gb": round(max(ram_samples), 2) if ram_samples else 0,
         }
+        sendData(point | stats, "pytorch")
 
-        if progress_callback:
-            progress_callback("pytorch", point | stats)
-        history.append(point)
+        #if progress_callback:
+        #    progress_callback("pytorch", point | stats)
+        history.append(point | stats)
 
-        sendData("pytorchData", "yes")
-
+    
     return {
         "library": "pytorch",
         "dataset": dataset,

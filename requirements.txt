@@ -14,3 +14,5 @@ psutil
 numpy
 kafka-python-ng
 python-dotenv
+confluent_kafka
+flask

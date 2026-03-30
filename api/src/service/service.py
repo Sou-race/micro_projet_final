@@ -2,6 +2,7 @@ from api.src.model.model import ModelResponseToFront
 from bdd.models import User
 import bcrypt
 
+
 #juste un test pour voir que tout marche dans ressource
 def test():
     res =ModelResponseToFront(
@@ -52,3 +53,4 @@ def verify_user(db, email, password):
         return None
 
     return user
+

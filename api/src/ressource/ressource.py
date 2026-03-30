@@ -33,6 +33,8 @@ class BenchmarkRequest(BaseModel):
     dataset: str
     epochs: int = 15
 
+
+
 @router.get("/api/health")
 async def health():
     health_counter.inc()
