@@ -65,6 +65,7 @@ def evaluate_model(model, test_loader):
 
 
 def train_pytorch(dataset, epochs=15, cpu_samples = [], ram_samples = []):
+    import psutil, os
     train_dataset, test_dataset, input_size, num_classes = load_dataset(dataset)
 
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
@@ -74,12 +75,17 @@ def train_pytorch(dataset, epochs=15, cpu_samples = [], ram_samples = []):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.01)
 
+    proc = psutil.Process()
+    num_cpus = os.cpu_count() or 1
     start = time.time()
     history = []
 
     
     for epoch in range(epochs):
         epoch_loss = 0.0
+        cpu_time_start = time.thread_time()
+        wall_start = time.time()
+        ram_before = proc.memory_info().rss / (1024 ** 3)
 
         for images, labels in train_loader:
             outputs = model(images)
@@ -92,25 +98,34 @@ def train_pytorch(dataset, epochs=15, cpu_samples = [], ram_samples = []):
             epoch_loss += loss.item()
 
         accuracy = evaluate_model(model, test_loader)
-        epoch_time = time.time() - start
+        elapsed_time = time.time() - start
+
+        cpu_time_end = time.thread_time()
+        wall_end = time.time()
+        ram_after = proc.memory_info().rss / (1024 ** 3)
+        wall_delta = wall_end - wall_start
+        cpu_delta = cpu_time_end - cpu_time_start
+        epoch_cpu_pct = round((cpu_delta / wall_delta) * 100 / num_cpus, 2) if wall_delta > 0 else 0
+        epoch_ram_gb = round((ram_before + ram_after) / 2, 2)
+
+        cpu_samples.append(epoch_cpu_pct)
+        ram_samples.append(epoch_ram_gb)
 
         point = {
             "epoch": epoch + 1,
             "loss": epoch_loss / len(train_loader),
             "accuracy": accuracy,
-            "elapsed_time": epoch_time,
+            "elapsed_time": elapsed_time,
         }
 
         stats = {
-            "cpu_avg": round(sum(cpu_samples) / len(cpu_samples), 2) if cpu_samples else 0,
-            "cpu_max": round(max(cpu_samples), 2) if cpu_samples else 0,
-            "ram_avg_gb": round(sum(ram_samples) / len(ram_samples), 2) if ram_samples else 0,
-            "ram_max_gb": round(max(ram_samples), 2) if ram_samples else 0,
+            "cpu_avg": epoch_cpu_pct,
+            "cpu_max": epoch_cpu_pct,
+            "ram_avg_gb": epoch_ram_gb,
+            "ram_max_gb": epoch_ram_gb,
         }
         sendData(point | stats, "pytorch")
 
-        #if progress_callback:
-        #    progress_callback("pytorch", point | stats)
         history.append(point | stats)
 
     

@@ -15,9 +15,6 @@ benchmark_lock = threading.Lock()
 current_job_id = None
 
 
-
-
-
 def _consumer_loop_benchmark(topic):
     consumer = _make_consumer(topic)
     while True:
@@ -66,24 +63,10 @@ def create_job(dataset, epochs=15):
 
 
 def train_with_monitoring(train_func, dataset, epochs, lib_name):
-    stop_event = threading.Event()
     cpu_samples = []
     ram_samples = []
 
-    def _monitor():
-        proc = psutil.Process()
-        while not stop_event.is_set():
-            cpu_samples.append(proc.cpu_percent(interval=None) / os.cpu_count())
-            ram_samples.append(proc.memory_info().rss / (1024 ** 3))
-            time.sleep(0.5)
-
-    monitor_thread = threading.Thread(target=_monitor, daemon=True)
-    monitor_thread.start()
-
     result = train_func(dataset, epochs, cpu_samples, ram_samples)
-
-    stop_event.set()
-    monitor_thread.join()
 
     avg_cpu = round(sum(cpu_samples) / len(cpu_samples), 2) if cpu_samples else 0
     max_cpu = round(max(cpu_samples), 2) if cpu_samples else 0

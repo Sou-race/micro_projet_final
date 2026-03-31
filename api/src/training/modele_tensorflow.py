@@ -30,6 +30,7 @@ def load_dataset(dataset):
 
 
 def train_tensorflow(dataset, epochs=15, cpu_samples = [], ram_samples = []):
+    import psutil
     x_train, y_train, x_test, y_test, num_classes = load_dataset(dataset)
 
     model = tf.keras.Sequential([
@@ -42,10 +43,16 @@ def train_tensorflow(dataset, epochs=15, cpu_samples = [], ram_samples = []):
         metrics=["accuracy"]
     )
 
+    proc = psutil.Process()
+    num_cpus = os.cpu_count() or 1
     start = time.time()
     history = []
 
     for epoch in range(epochs):
+        cpu_time_start = time.thread_time()
+        wall_start = time.time()
+        ram_before = proc.memory_info().rss / (1024 ** 3)
+
         hist = model.fit(
             x_train,
             y_train,
@@ -55,6 +62,16 @@ def train_tensorflow(dataset, epochs=15, cpu_samples = [], ram_samples = []):
         )
 
         loss, accuracy = model.evaluate(x_test, y_test, verbose=0)
+        cpu_time_end = time.thread_time()
+        wall_end = time.time()
+        ram_after = proc.memory_info().rss / (1024 ** 3)
+        wall_delta = wall_end - wall_start
+        cpu_delta = cpu_time_end - cpu_time_start
+        epoch_cpu_pct = round((cpu_delta / wall_delta) * 100 / num_cpus, 2) if wall_delta > 0 else 0
+        epoch_ram_gb = round((ram_before + ram_after) / 2, 2)
+
+        cpu_samples.append(epoch_cpu_pct)
+        ram_samples.append(epoch_ram_gb)
 
         point = {
             "epoch": epoch + 1,
@@ -64,15 +81,13 @@ def train_tensorflow(dataset, epochs=15, cpu_samples = [], ram_samples = []):
         }
 
         stats = {
-            "cpu_avg": round(sum(cpu_samples) / len(cpu_samples), 2) if cpu_samples else 0,
-            "cpu_max": round(max(cpu_samples), 2) if cpu_samples else 0,
-            "ram_avg_gb": round(sum(ram_samples) / len(ram_samples), 2) if ram_samples else 0,
-            "ram_max_gb": round(max(ram_samples), 2) if ram_samples else 0,
+            "cpu_avg": epoch_cpu_pct,
+            "cpu_max": epoch_cpu_pct,
+            "ram_avg_gb": epoch_ram_gb,
+            "ram_max_gb": epoch_ram_gb,
         }
 
         sendData(point | stats, "tensorflow")
-        #if progress_callback:
-        #    progress_callback("tensorflow", point | stats)
 
         history.append(point | stats)
 
