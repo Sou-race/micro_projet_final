@@ -4,10 +4,11 @@ import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from api.src.model.model import ModelResponseToFront
+from api.src.model.model import ModelResponseToFront, LoginRequest, RegisterRequest, BenchmarkRequest
 from api.src.service.service import test, create_user, verify_user,create_access_token, get_current_user
 from bdd.database import get_db
 from api.src.training.benchmark import create_job, get_job_status
+from api.src.kafkaOption.producer import sendData
 router = APIRouter(prefix="/prouteur", tags=["Prouteur"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="prouteur/api/login")
@@ -17,23 +18,7 @@ health_counter = Counter(
     "Number of health check requests received"
 )
 
-#classe de connexion  
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
-#classe d'inscription
-class RegisterRequest(BaseModel):
-    nom: str
-    prenom: str
-    email: EmailStr
-    password: str
-    
-
-#recup le nom du dataset sur lequel on veut train nos modèles
-class BenchmarkRequest(BaseModel):
-    dataset: str
-    epochs: int = 15
 
 @router.get("/api/health")
 async def health():
@@ -55,6 +40,16 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
+    data = {
+            "id": user.id,
+            "nom": user.nom,
+            "prenom": user.prenom,
+            "email": user.email,
+            "admin": user.admin,
+            "type": "register"
+        }
+    sendData(data, "loginLog")
+
     return {
         "success": True,
         "message": "Utilisateur créé",
@@ -74,6 +69,17 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
     access_token = create_access_token(data={"sub": user.email})
+    
+    data = {
+            "id": user.id,
+            "nom": user.nom,
+            "prenom": user.prenom,
+            "email": user.email,
+            "admin": user.admin,
+            "type": "login"
+        }
+    sendData(data, "loginLog")
+
     return {
         "success": True,
         "access_token": access_token,

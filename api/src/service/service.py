@@ -1,6 +1,9 @@
+import csv
 from datetime import datetime, timedelta
 from datetime import datetime, timedelta
+import json
 import os
+import threading
 from dotenv import load_dotenv
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
@@ -10,6 +13,8 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 from api.src.model.model import ModelResponseToFront
 from bdd.models import User
+from api.src.kafkaOption.consumer import _make_consumer
+
 import bcrypt
 
 load_dotenv()
@@ -32,6 +37,58 @@ def test():
         "title": "test",
         "description": "réponse de test"
     }
+
+
+
+def _consumer_loop_logs(topic):
+    print("test")
+    consumer = _make_consumer(topic)
+    csv_file = "/app/api/src/logs_login.csv"
+    
+    folder = os.path.dirname(csv_file)
+    if not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+    
+    file_exists = os.path.isfile(csv_file)
+    print("test du file",file_exists)
+    with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
+
+
+        fieldnames = ['id', 'nom', 'prenom', 'admin', 'type'] 
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+            f.flush()
+            os.fsync(f.fileno())
+
+        while True:
+            try:
+                msg = consumer.poll(1.0)
+                if msg is None:
+                    continue
+                if msg.error():
+                    print(f"Kafka error [{topic}]: {msg.error()}")
+                    continue
+                data = json.loads(msg.value().decode("utf-8"))
+                print(data)
+                writer.writerow({
+                        'id': data.get('id'),
+                        'nom': data.get('nom'),
+                        'prenom': data.get('prenom'),
+                        'admin': data.get('admin'),
+                        'type': data.get('type')
+
+                    })
+                    
+                f.flush()
+                os.fsync(f.fileno())
+                
+            except Exception as e:
+                print(f"Consumer error [{topic}]: {e}")
+
+threading.Thread(target=_consumer_loop_logs, args=("loginLog",), daemon=True).start()
+
+
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")

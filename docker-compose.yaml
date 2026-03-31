@@ -106,7 +106,7 @@ services:
           echo 'Tentative de suppression du groupe dataModel...'
           kafka-consumer-groups --bootstrap-server kafka:29092 --delete --group dataModel || echo 'Le groupe n existe pas encore, passage à la suite.';
           
-          echo 'Nettoyage terminé !'
+          echo 'Nettoyage terminé'
         "
       networks:
       - micro_network
@@ -114,6 +114,7 @@ volumes:
   postgres_data:
   datasets_cache:
   kafka_kraft:
+  
   
 networks:
   micro_network:

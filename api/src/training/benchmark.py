@@ -6,6 +6,7 @@ import time
 import os
 from flask import json
 from confluent_kafka import Consumer
+from api.src.kafkaOption.consumer import _make_consumer
 from api.src.training.modele_pytorch import train_pytorch
 from api.src.training.modele_tensorflow import train_tensorflow
 
@@ -14,19 +15,10 @@ benchmark_lock = threading.Lock()
 current_job_id = None
 
 
-def _make_consumer(topic):
-    c = Consumer({
-        'bootstrap.servers': 'kafka:29092',
-        'group.id': f'dataModel-{topic}',
-        'auto.offset.reset': 'latest',
-        'session.timeout.ms': 6000,
-        'heartbeat.interval.ms': 2000
-    })
-    c.subscribe([topic])
-    return c
 
 
-def _consumer_loop(topic):
+
+def _consumer_loop_benchmark(topic):
     consumer = _make_consumer(topic)
     while True:
         try:
@@ -45,8 +37,9 @@ def _consumer_loop(topic):
 
 
 #un thread consumer dédié par topic
-threading.Thread(target=_consumer_loop, args=("pytorch",), daemon=True).start()
-threading.Thread(target=_consumer_loop, args=("tensorflow",), daemon=True).start()
+threading.Thread(target=_consumer_loop_benchmark, args=("pytorch",), daemon=True).start()
+threading.Thread(target=_consumer_loop_benchmark, args=("tensorflow",), daemon=True).start()
+
 
 
 def create_job(dataset, epochs=15):
